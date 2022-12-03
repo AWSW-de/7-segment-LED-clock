@@ -54,7 +54,7 @@
 // ###########################################################################################################################################
 // # Version number of the code:
 // ###########################################################################################################################################
-const char* CLOCK_VERSION = "V1.0.0";
+const char* CLOCK_VERSION = "V1.0.1";
 // NOTE: Very 1st version... Needs a lot of cleanup and integration of some funcions... Basic function seems to be OK.
 
 
@@ -71,6 +71,7 @@ String UpdatePath = "-";                                                        
 String UpdatePathIP = "-";                                                           // Update via IP-address
 ESP8266HTTPUpdateServer httpUpdater;                                                 // Update server
 std::unique_ptr<ESP8266WebServer> server1;                                           // REST function web server
+bool LEDsON = true;                                                                  // Global flag to turn LEDs on or off - Used for the PING function
 bool RESTmanLEDsON = true;                                                           // Global flag to turn LEDs manually on or off - Used for the REST function
 
 
@@ -140,9 +141,9 @@ void setup() {
   // REST function web server:
   server1.reset(new ESP8266WebServer(WiFi.localIP(), server1port));
   server1->on("/", handleRoot);
-  //server1->on("/ledson", ledsON);
-  //server1->on("/ledsoff", ledsOFF);
-  //server1->on("/ledstatus", LedStatus);
+  server1->on("/ledson", ledsON);
+  server1->on("/ledsoff", ledsOFF);
+  server1->on("/ledstatus", LedStatus);
   server1->on("/clockrestart", ClockRestart);
   server1->on("/clockwifireset", ClockWifiReset);
   server1->begin();
@@ -162,60 +163,61 @@ void setup() {
 // # Loop function which runs all the time after the startup was done:
 // ###########################################################################################################################################
 void loop() {
-  //ESP.wdtFeed();  // Reset watchdog timer
-
   // Check WiFi connection and reconnect if needed:
-  // if (WiFi.status() != WL_CONNECTED) {
-  //   WIFI_login();  // WiFi inactive --> Reconnect to it...
-  // } else {         // Wifi active --> Sort some atoms in the univers and show the time...
+  //if (WiFi.status() != WL_CONNECTED) {
+  //  WIFI_login();  // WiFi inactive --> Reconnect to it...
+  //} else {         // Wifi active --> Sort some atoms in the univers and show the time...
   // Check, whether something has been entered on Config Page
   checkClient();
-  //ESP.wdtFeed();  // Reset watchdog timer
-  handleTime();  // handle NTP / RTC time
-  delay(750);
+  handleTime();
 
   redVal = redVal;
   greenVal = greenVal;
   blueVal = blueVal;
 
-  /* // Show the display only during the set Min/Max time if option is set
-    if (displayoff) {
-      switch (iWeekDay) {
-        case 0:  // Sunday
-          DayNightMode(displayonminSU, displayonmaxSU);
-          break;
-        case 1:  // Monday
-          DayNightMode(displayonminMO, displayonmaxMO);
-          break;
-        case 2:  // Tuesday
-          DayNightMode(displayonminTU, displayonmaxTU);
-          break;
-        case 3:  // Wednesday
-          DayNightMode(displayonminWE, displayonmaxWE);
-          break;
-        case 4:  // Thursday
-          DayNightMode(displayonminTH, displayonmaxTH);
-          break;
-        case 5:  // Friday
-          DayNightMode(displayonminFR, displayonmaxFR);
-          break;
-        case 6:  // Saturday
-          DayNightMode(displayonminSA, displayonmaxSA);
-          break;
-      }
-    } else {*/
+  /*
+  Serial.println(iWeekDay);
+  // Show the display only during the set Min/Max time if option is set
+  if (displayoff) {
+    switch (iWeekDay) {
+      case 0:  // Sunday
+        DayNightMode(displayonminSU, displayonmaxSU);
+        break;
+      case 1:  // Monday
+        DayNightMode(displayonminMO, displayonmaxMO);
+        break;
+      case 2:  // Tuesday
+        DayNightMode(displayonminTU, displayonmaxTU);
+        break;
+      case 3:  // Wednesday
+        DayNightMode(displayonminWE, displayonmaxWE);
+        break;
+      case 4:  // Thursday
+        DayNightMode(displayonminTH, displayonmaxTH);
+        break;
+      case 5:  // Friday
+        DayNightMode(displayonminFR, displayonmaxFR);
+        break;
+      case 6:  // Saturday
+        DayNightMode(displayonminSA, displayonmaxSA);
+        break;
+    }
+  } else { */
   pixels.setBrightness(intensity);  // DAY brightness
   //}
 
   // Web update start:
   httpServer.handleClient();
-  //MDNS.update();
+  MDNS.update();
 
-  //if (LEDsON == true && RESTmanLEDsON == true) pixels.show();  // This sends the updated pixel color to the hardware.
-  // }
+  // if (LEDsON == true && RESTmanLEDsON == true) pixels.show();  // This sends the updated pixel color to the hardware.
+  //}
 
   // REST function web server:
   server1->handleClient();
+
+  // Slow down:
+  delay(750);
 }
 
 
@@ -420,7 +422,10 @@ void checkClient() {
             client.print(intensity);
             client.println("</span>");
             client.println("<script type='text/javascript'>\r\nfunction showValue(newValue)\r\n{\r\ndocument.getElementById('valrange').innerHTML=newValue;\r\n}\r\n</script>\r\n");
-            client.println("</label><br><br><hr>");
+            client.println("</label><br><br>");
+
+            client.print("<hr>");
+
 
             /*
             // Intensity Night:
@@ -436,7 +441,8 @@ void checkClient() {
             client.println("</label>");
             client.print("<br><hr>");
 
-            
+
+
             // Show date value as scrolling text every minute after 30s:
             // #########################################################
             client.println("<h2>" + txtShowDate1 + ":</h2><br>");
@@ -448,6 +454,7 @@ void checkClient() {
             client.print("<br><hr>");
 
 
+            
             // Night mode - display off:
             // ###########
             client.println("<h2>" + txtNightMode1 + ":</h2><br>");
@@ -531,7 +538,8 @@ void checkClient() {
             client.println("</select>:00 " + txtNightModeTo + " <select id=\"displayonminSU\" name=\"displayonminSU\" ><option selected=\"selected\">");
             client.println(displayonminSU);
             client.println("</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select>:59 " + txtNightModeClock + " <br><br><hr>");
-            */
+*/
+
 
             // LED display and startup:
             // ########################
@@ -576,7 +584,7 @@ void checkClient() {
             client.println("</fieldset>");
             client.println("<br><br><hr>");
 
-            /*
+
             // Hostname:
             // #########
             client.println("<h2>" + txtHostName1 + ":</h2><br>");
@@ -586,17 +594,13 @@ void checkClient() {
             client.println(wchostnamenum);
             client.println("</option><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select><br><br><hr>");
 
-         
+
+/*
             // REST functions:
             // ###############
             client.println("<h2>" + txtREST0 + ":</h2>");
-            client.println("<label>" + txtREST1 + "</label><br><br>");
-            client.println("<label for=\"useresturl\">" + txtREST2 + " </label>");
-            client.print("<input type=\"checkbox\" id=\"useresturl\" name=\"useresturl\"");
-            client.print(" checked");
-            client.print("><br><br>");
-            client.println("<label>" + txtREST3 + ": </label>");
-            client.println("<br>");
+            client.println("<label>" + txtREST1 + ": </label><br><br>");
+            client.println("<label>" + txtREST3 + ": </label><br><br>");
             client.println("<label>" + txtREST4 + ": </label>");
             client.println("<a href=http://" + WiFi.localIP().toString() + ":" + server1port + "/ledsoff target='_blank'>http://" + WiFi.localIP().toString() + ":" + server1port + "/ledsoff</a><br>");
             client.println("<label>" + txtREST5 + ": </label>");
@@ -608,7 +612,7 @@ void checkClient() {
 
             // Update function:
             // ################
-             client.println("<h2>" + txtUpdate0 + ":</h2>");
+            client.println("<h2>" + txtUpdate0 + ":</h2>");
             client.println("<fieldset>");
             client.println("<div>");
             client.println("<input type='radio' id='idupdate0' name='useupdate' value='0'");
@@ -618,7 +622,7 @@ void checkClient() {
             } else {
               client.print(">");
             }
-            client.println("<label for='idupdate0'>" + txtUpdateE1 + "</label>");
+            client.println("<label for='idupdate0'>" + txtUpdate1 + "</label>");
             client.println("</div>");
             client.println("<div>");
             client.println("<input type='radio' id='idupdate1' name='useupdate' value='1'");
@@ -628,7 +632,7 @@ void checkClient() {
             } else {
               client.print(">");
             }
-            client.println("<label for='idupdate1'>" + txtUpdateE2 + "</label>");
+            client.println("<label for='idupdate1'>" + txtUpdate2 + "</label>");
             client.println("</div>");
             client.println("<div>");
             client.println("<input type='radio' id='idupdate2' name='useupdate' value='2'");
@@ -638,14 +642,14 @@ void checkClient() {
             } else {
               client.print(">");
             }
-            client.println("<label for='idupdate2'>" + txtUpdateE3 + "</label>");
+            client.println("<label for='idupdate2'>" + txtUpdate3 + "</label>");
             client.println("</div>");
             client.println("</fieldset>");
 
             // Update details section:
-            if (useupdate == -1) useupdate = 1;  // Fix for setting from older versions
+
             if (useupdate == 0) {
-              client.println("<br><br><label>" + txtUpdateX + "</label>");
+              client.println("<br><br><label>" + txtUpdate1 + "</label>");
             }
             if (useupdate == 1) {
               client.println("<br><br><label>" + txtUpdate2 + ":</label><br><br>");
@@ -653,23 +657,10 @@ void checkClient() {
               client.println("<a href=" + UpdatePathIP + " target='_blank'>" + UpdatePathIP + "</a><br><br>");
               client.println("<label>" + txtUpdate3 + "<br>" + txtUpdate4 + "</label>");
               client.println("<br><br><label>" + txtUpdate5 + ":</label>");
-              client.println("<a href='https://github.com/N1cls/Clock' target='_blank'>" + txtUpdate6 + "</a>");
+              client.println("<a href='https://github.com/AWSW-de/WordClock-16x16-LED-matrix' target='_blank'>" + txtUpdate6 + "</a>");
             }
-            if (useupdate == 2) {
-              if (AvailableVersion == "-") readhttpfile();  // Read version from internet if function used for the first time...
-              if (UpdateAvailable == 0) {
-                client.println("<br><br><label>" + txtUpdate7 + ": " + AvailableVersion + "</label>");
-              }
-              if (UpdateAvailable == 1) {
-                client.println("<br><br><label><b>" + txtUpdate8 + ": " + AvailableVersion + "</b></label><br><br>");
-                if (useresturl == -1) {
-                  client.println("<label>" + txtUpdate9 + ": <a href= http://" + WiFi.localIP().toString() + ":" + server1port + "/esphttpupdate target='_blank'>" + txtUpdate0 + "</a></label>");
-                } else {
-                  // client.println("<label>" + txtRESTX + " - " + txtUpdateX + "</label>");
-                }
-              }
-            }
-            client.println("<br><br><hr>"); */
+            client.println("<br><br><hr>");
+*/
 
 
             // Reset WiFi configuration:
@@ -737,14 +728,14 @@ void checkClient() {
                 blueVal = strtol(newBlue.begin(), &succ, 16);
               }
 
-              /*
+
               // Check for date display:
               // #######################
               if (currentLine.indexOf("&showdate=on&") >= 0) {
                 showDate = -1;
               } else {
                 showDate = 0;
-              } 
+              }
 
 
               // Check for DisplayOff switch:
@@ -938,7 +929,7 @@ void checkClient() {
               } else {
                 httpUpdater.setup(&httpServer);
                 httpServer.stop();
-              } */
+              }
 
 
               // Check for Use LED test switch:
@@ -977,7 +968,7 @@ void checkClient() {
 
               // Get intensity NIGHT:
               // ####################
-              /*
+
               pos = currentLine.indexOf("&intensityNight=");
               if (pos >= 0) {
                 String intStr = currentLine.substring(pos + 16, pos + 19);
@@ -986,7 +977,6 @@ void checkClient() {
                   intStr = intStr.substring(0, pos);
                 intensityNight = intStr.toInt();
               }
-              */
 
 
               // Get NTP server:
@@ -1017,8 +1007,8 @@ void checkClient() {
 
               // Save data to EEPROM:
               // ####################
-              writeEEPROM();  // save DATA to EEPROM
-              //configNTPTime();  // Reset NTP
+              writeEEPROM();    // save DATA to EEPROM
+              configNTPTime();  // Reset NTP
             }
             currentLine = "";  // Clear the current command line
           }
@@ -1128,156 +1118,12 @@ void dunkel() {
 
 
 // ###########################################################################################################################################
-// # Convert x/y coordinates into LED number return -1 for invalid coordinate:
-// ###########################################################################################################################################
-/*int ledXY(int x, int y) {
-  // Test for valid coordinates
-  // If outside panel return -1
-  if ((x < 0) || (x > 10) || (y < 0) || (y > 9))
-    return -1;
-  int ledNr = (9 - y) * 11;
-  if ((y % 2) == 0)
-    ledNr = ledNr + x;
-  else
-    ledNr = ledNr + 10 - x;
-  return ledNr;
-}*/
-
-
-// ###########################################################################################################################################
-// # Sets, where the numbers from 1 to 9 are printed:
-// ###########################################################################################################################################
-/*void printAt(int ziffer, int x, int y) {
-  switch (ziffer) {
-    case 0:                                 //number 0
-      setLEDLine(x + 1, x + 3, y + 6, -1);  //-1 is true, so switchOn
-      for (int yd = 1; yd < 6; yd++) {
-        setLED(ledXY(x, y + yd), ledXY(x, y + yd), -1);
-        setLED(ledXY(x + 4, y + yd), ledXY(x + 4, y + yd), -1);
-      }
-      setLEDLine(x + 1, x + 3, y, -1);
-      break;
-
-    case 1:  //number 1
-      setLED(ledXY(x + 3, y + 5), ledXY(x + 3, y + 5), -1);
-      setLED(ledXY(x + 2, y + 4), ledXY(x + 2, y + 4), -1);
-      for (int yd = 0; yd <= 6; yd++) {
-        setLED(ledXY(x + 4, y + yd), ledXY(x + 4, y + yd), -1);
-      }
-      break;
-
-    case 2:  //number 2
-      for (int d = 1; d <= 4; d++) {
-        setLED(ledXY(x + d, y + d), ledXY(x + d, y + d), -1);
-      }
-      setLEDLine(x, x + 4, y, -1);
-      setLED(ledXY(x, y + 5), ledXY(x, y + 5), -1);
-      setLED(ledXY(x + 4, y + 5), ledXY(x + 4, y + 5), -1);
-      setLEDLine(x + 1, x + 3, y + 6, -1);
-      break;
-
-    case 3:  //number 3
-      for (int yd = 1; yd <= 2; yd++) {
-        setLED(ledXY(x + 4, y + yd + 3), ledXY(x + 4, y + yd + 3), -1);
-        setLED(ledXY(x + 4, y + yd), ledXY(x + 4, y + yd), -1);
-      }
-      for (int yd = 0; yd < 7; yd = yd + 3) {
-        setLEDLine(x + 1, x + 3, y + yd, -1);
-      }
-      setLED(ledXY(x, y + 1), ledXY(x, y + 1), -1);
-      setLED(ledXY(x, y + 5), ledXY(x, y + 5), -1);
-      break;
-
-    case 4:  //number 4
-      for (int d = 0; d <= 3; d++) {
-        setLED(ledXY(x + d, y + d + 3), ledXY(x + d, y + d + 3), -1);
-      }
-      for (int yd = 0; yd <= 3; yd++) {
-        setLED(ledXY(x + 3, y + yd), ledXY(x + 3, y + yd), -1);
-      }
-      setLEDLine(x, x + 4, y + 2, -1);
-      break;
-
-    case 5:  //number 5
-      setLEDLine(x, x + 4, y + 6, -1);
-      setLED(ledXY(x, y + 5), ledXY(x, y + 5), -1);
-      setLED(ledXY(x, y + 4), ledXY(x, y + 4), -1);
-      setLEDLine(x, x + 3, y + 3, -1);
-      setLED(ledXY(x + 4, y + 2), ledXY(x + 4, y + 2), -1);
-      setLED(ledXY(x + 4, y + 1), ledXY(x + 4, y + 1), -1);
-      setLEDLine(x, x + 3, y, -1);
-      break;
-
-    case 6:  //number 6
-      for (int d = 0; d <= 3; d++) {
-        setLED(ledXY(x + d, y + d + 3), ledXY(x + d, y + d + 3), -1);
-      }
-      for (int yd = 0; yd < 4; yd = yd + 3) {
-        setLEDLine(x + 1, x + 3, y + yd, -1);
-      }
-      setLED(ledXY(x, y + 1), ledXY(x, y + 1), -1);
-      setLED(ledXY(x, y + 2), ledXY(x, y + 2), -1);
-      setLED(ledXY(x + 4, y + 1), ledXY(x + 4, y + 1), -1);
-      setLED(ledXY(x + 4, y + 2), ledXY(x + 4, y + 2), -1);
-      break;
-
-    case 7:  //number 7
-      for (int yd = 0; yd <= 6; yd++) {
-        setLED(ledXY(x + 3, y + yd), ledXY(x + 3, y + yd), -1);
-      }
-      setLEDLine(x + 1, x + 4, y + 3, -1);
-      setLEDLine(x, x + 3, y + 6, -1);
-      break;
-
-    case 8:  //number 8
-      for (int yd = 1; yd <= 2; yd++) {
-        setLED(ledXY(x + 4, y + yd + 3), ledXY(x + 4, y + yd + 3), -1);
-        setLED(ledXY(x + 4, y + yd), ledXY(x + 4, y + yd), -1);
-        setLED(ledXY(x, y + yd + 3), ledXY(x, y + yd + 3), -1);
-        setLED(ledXY(x, y + yd), ledXY(x, y + yd), -1);
-      }
-      for (int yd = 0; yd < 7; yd = yd + 3) {
-        setLEDLine(x + 1, x + 3, y + yd, -1);
-      }
-      break;
-
-    case 9:  //number 9
-      for (int d = 0; d <= 3; d++) {
-        setLED(ledXY(x + d + 1, y + d), ledXY(x + d + 1, y + d), -1);
-      }
-      for (int yd = 4; yd <= 5; yd++) {
-        setLED(ledXY(x, y + yd), ledXY(x, y + yd), -1);
-        setLED(ledXY(x + 4, y + yd), ledXY(x + 4, y + yd), -1);
-      }
-      setLEDLine(x + 1, x + 3, y + 6, -1);
-      setLEDLine(x + 1, x + 4, y + 3, -1);
-      break;
-  }
-}*/
-
-
-// ###########################################################################################################################################
-// # Turns on the outer four LEDs (one per minute):
-// ###########################################################################################################################################
-/*void showMinutes(int minutes) {
-  int minMod = (minutes % 5);
-  for (int i = 1; i < 5; i++) {
-    int ledNr = 0;
-
-    if (minMod < i)
-      pixels.setPixelColor(ledNr, pixels.Color(0, 0, 0));
-    else
-      pixels.setPixelColor(ledNr, pixels.Color(redVal, greenVal, blueVal));
-  } 
-}*/
-
-
-// ###########################################################################################################################################
 // # Show current date on clock with moving digits:
 // ###########################################################################################################################################
 /*void showCurrentDate() {
+  // TODO
 }*/
-  
+
 
 // ###########################################################################################################################################
 // # Startup LED test function:
@@ -1308,7 +1154,6 @@ void DisplayTest() {
 void numbers(int wert, int stelle, int dots) {
   int row = 0;
 
-
   switch (stelle) {
     case 0:
       {
@@ -1331,7 +1176,6 @@ void numbers(int wert, int stelle, int dots) {
         break;
       }
   }
-
 
   for (int i = row; i < row + 7; i++) {
     pixels.setPixelColor(i, pixels.Color(0, 0, 0));   // Switch off all LEDs in that row
@@ -1411,7 +1255,6 @@ void numbers(int wert, int stelle, int dots) {
 }
 
 
-
 // ###########################################################################################################################################
 // # Handle the time from the NTP server and write it to the RTC:
 // ###########################################################################################################################################
@@ -1430,6 +1273,10 @@ void handleTime() {
     int ho = ti.tm_hour;
     int mi = ti.tm_min;
     int sec = ti.tm_sec;
+
+    // Weekday fix:
+    // long day = now / 86400L;
+    // iWeekDay = (da + 4) % 7;
 
     // NTP TIME WITHOUT RTC:
     if (timedebug == 1) Serial.print("Current time: ");
@@ -1460,7 +1307,7 @@ void handleTime() {
       dots = 1;
     }
 
-    // Add leading zero:
+    // Add leading zeros:
     int hour = ho;
     int mini = mi;
     String h = String(hour);
@@ -1485,11 +1332,11 @@ void handleTime() {
 // ###########################################################################################################################################
 /*void DayNightMode(int displayonMin, int displayonMax) {
   if (iHour > displayonMin && iHour < displayonMax) {
-    ShowTheTime();
+    handleTime();
   } else {
-    if (useNightLEDs == -1) {
+    if (useNightLEDs == 1) {
       pixels.setBrightness(intensityNight);  // Night brightness
-      ShowTheTime();
+      handleTime();
     } else {
       dunkel();
     }
@@ -1569,7 +1416,7 @@ void handleRoot() {
 // ###########################################################################################################################################
 // # REST command function: LED set to ON
 // ###########################################################################################################################################
-/*void ledsON() {
+void ledsON() {
   WiFiClient client = server.available();
   server1->send(200, "text/plain", "Clock LEDs set to ON");
   Serial.println("Clock LEDs set to ON");
@@ -1578,13 +1425,13 @@ void handleRoot() {
   LEDsON = true;
   pixels.show();
   client.stop();
-}*/
+}
 
 
 // ###########################################################################################################################################
 // # REST command function: LED set to OFF
 // ###########################################################################################################################################
-/*void ledsOFF() {
+void ledsOFF() {
   WiFiClient client = server.available();
   server1->send(200, "text/plain", "Clock LEDs set to OFF");
   Serial.println("Clock LEDs set to OFF");
@@ -1594,19 +1441,19 @@ void handleRoot() {
   LEDsON = false;
   pixels.show();
   client.stop();
-}*/
+}
 
 
 // ###########################################################################################################################################
 // # REST command function: LED status
 // ###########################################################################################################################################
-/*void LedStatus() {
+void LedStatus() {
   WiFiClient client = server.available();
   server1->send(200, "text/plain", String(LEDsON));
   Serial.print("LED status: ");
   Serial.println(LEDsON);
   client.stop();
-}*/
+}
 
 
 // ###########################################################################################################################################
@@ -1671,12 +1518,11 @@ void setLED(int ledNrFrom, int ledNrTo, int switchOn) {
 // # Wifi Manager setup and reconnect function that runs once at startup and during the loop function of the ESP:
 // ###########################################################################################################################################
 void WIFI_login() {
-  //Serial.print("Try to connect to WiFi: ");
-  //Serial.println(WiFi.SSID());
+  Serial.print("Try to connect to WiFi: ");
+  Serial.println(WiFi.SSID());
   bool WiFires;
   WiFiManager wifiManager;
-  // configNTPTime();                                 // Set timezone
-  wifiManager.setConfigPortalTimeout(AP_TIMEOUT);  // Max wait for 3 minutes
+  wifiManager.setConfigPortalTimeout(AP_TIMEOUT);  // Max wait for WiFi reset
   WiFires = wifiManager.autoConnect(DEFAULT_AP_NAME);
   if (!WiFires) {
     Serial.print("Failed to connect to WiFi: ");

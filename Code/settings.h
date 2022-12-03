@@ -6,6 +6,8 @@
 // #
 // # Released under license: GNU General Public License v3.0: https://github.com/AWSW-de/7-segment-LED-clock/blob/main/LICENSE
 // #
+// # Compatible with version: V1.0.1
+// # 
 // ###########################################################################################################################################
 /*
  ________                                                        __             
@@ -55,6 +57,7 @@ int clockreset = 0;                         // WordClock Reset switch (not store
 int useledtest = 1;                         // Show start animation and display test at boot
 int showDate = 0;                           // Show date when seconds = 30 ? - Note: Any value <> 0 shows the date when second = 30
 int server1port = 55555;                    // REST function web server port
+int useupdate = 1;                          // Use the software update function of the device
 
 
 // ###########################################################################################################################################
